@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Time Capsule",
+        "description": "SSH connection details for the modded Time Capsule running envstat.",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "port": "Port",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the host and port, and that the device is reachable.",
+      "invalid_auth": "Authentication failed. Check the username and password.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Time Capsule is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Time Capsule connection settings",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "port": "Port",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check the host and port, and that the device is reachable.",
+      "invalid_auth": "Authentication failed. Check the username and password.",
+      "unknown": "Unexpected error."
+    }
+  }
+}

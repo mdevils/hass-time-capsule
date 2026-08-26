@@ -1,0 +1,9 @@
+# Personal deploy script -- references internal host/network details that
+# shouldn't be public. Keep it locally, never commit it.
+/scripts/
+
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
