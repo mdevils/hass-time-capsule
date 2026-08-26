@@ -1,21 +1,19 @@
 # Time Capsule Sensors
 
-A Home Assistant integration for modded Apple Time Capsules that expose
-`envstat` and SMART data over SSH. It polls once a minute and creates:
+A Home Assistant integration for modded Apple Time Capsules. It polls the
+device once a minute and reports:
 
-- Temperature sensors for every `degC` reading `envstat` reports (internal,
-  external 1-3), skipping `T_hdd`, which this hardware never populates.
-- A fan speed sensor (RPM).
-- A sensor for every row of `atactl wd0 smart status` (raw value, with the
-  normalized value/threshold/criticality as attributes).
+- Temperature sensors: internal, and external 1-3.
+- Fan speed (RPM).
+- A sensor for every SMART attribute the drive reports (raw value, with the
+  normalized value/threshold/criticality as attributes) -- reallocated
+  sectors, power-on hours, pending sectors, temperature, and so on.
 - An overall SMART Status sensor (`Passed` / `Failed` / `Disabled` /
-  `Not Supported`), computed the same way `smartctl`'s health verdict is:
-  an attribute has failed once its normalized value drops to or below its
-  threshold on a row marked critical.
+  `Not Supported`).
 
-It talks to the Time Capsule's old NetBSD-based `sshd`, which only offers a
-`diffie-hellman-group14-sha1` key exchange and signs its host key with plain
-`ssh-rsa` -- both are handled automatically, no manual SSH config needed.
+It may also work with an AirPort Extreme, since it shares the same internal
+tooling, but that hasn't been tested -- if you try it, let me know via an
+issue.
 
 ## Prerequisites
 
@@ -28,19 +26,19 @@ installing modern Samba, its setup step enables SSH on the device for you
 `configure` step (or the equivalent step in its macOS GUI app) and confirm
 SSH comes up before moving on.
 
-### 2. Give the Time Capsule a static IP
+### 2. If you'll use an IP address, make it static
 
-This integration is configured with a plain IP address, not a hostname, so
-if the Time Capsule's address changes (e.g. after a DHCP lease renewal),
-you'll need to update the integration. Avoid that by reserving a fixed IP
-for it in your router (DHCP reservation, sometimes called a "static lease"
-or "address reservation" -- look up your router's admin UI for the exact
-term), keyed to the Time Capsule's MAC address.
+The integration accepts either a hostname or an IP address for the Time
+Capsule. If you use an IP, reserve it in your router (DHCP reservation,
+sometimes called a "static lease" or "address reservation" -- look up your
+router's admin UI for the exact term), keyed to the Time Capsule's MAC
+address, so it doesn't change on you later. A hostname doesn't need this,
+as long as it reliably resolves to the device.
 
-### 3. Know your Time Capsule's root/admin password
+### 3. Know your Time Capsule's password
 
-The integration authenticates over SSH with a username (`root` by default)
-and password -- the same one used above to enable SSH.
+The SSH password is your Time Capsule's own admin password -- the same one
+you used with TimeCapsuleSMB above.
 
 ## Installation
 
@@ -64,16 +62,30 @@ Configuration is done entirely from the UI -- there's no YAML.
 
 1. **Settings -> Devices & Services -> Add Integration -> Time Capsule Sensors.**
 2. Enter:
-   - **Host**: the Time Capsule's (static) IP address.
+   - **Host**: the Time Capsule's hostname or IP address.
    - **Username**: `root` by default.
    - **Port**: `22` by default.
-   - **Password**: the admin/root password from the prerequisites above.
-3. The integration connects and runs `envstat` + `smart status` before
-   saving, so a wrong host/password shows an inline error immediately
-   instead of failing silently later.
+   - **Password**: the Time Capsule's admin password, from the prerequisites above.
+3. The integration connects and fetches real data before saving, so a wrong
+   host/password shows an inline error immediately instead of failing
+   silently later.
 
 To change any of these later, open the integration's entry and click
 **Configure** -- no need to remove and re-add it.
 
 The poll interval is fixed at 60 seconds and isn't currently exposed in the
 UI.
+
+## How it works
+
+The integration authenticates over SSH and runs two commands: `envstat`,
+for the temperature and fan readings, and `atactl wd0 smart status`, for
+the SMART table. The SMART Status sensor's pass/fail is computed the same
+way `smartctl`'s health verdict is: an attribute has failed once its
+normalized value drops to or below its threshold on a row marked critical.
+
+These Time Capsules run an old NetBSD-based `sshd` that only offers a
+`diffie-hellman-group14-sha1` key exchange and signs its host key with
+plain `ssh-rsa` -- both long dropped as defaults by current OpenSSH and
+Paramiko. The integration requests them explicitly, so no manual SSH
+configuration is needed on your end.
