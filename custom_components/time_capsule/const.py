@@ -11,11 +11,12 @@ DEFAULT_USERNAME = "root"
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 CONNECT_TIMEOUT = 15
 
-# Full paths, not just "envstat" / "atactl": a non-interactive SSH command
-# runs with a minimal PATH that doesn't include /usr/sbin or /sbin on this
-# device, even though an interactive shell's profile does.
+# Full paths, not just "envstat" / "atactl" / "df": a non-interactive SSH
+# command runs with a minimal PATH that doesn't include /usr/sbin or /sbin
+# on this device, even though an interactive shell's profile does.
 ENVSTAT_COMMAND = "/usr/sbin/envstat"
 SMART_COMMAND = "/sbin/atactl wd0 smart status"
+DF_COMMAND = "/bin/df /dev/dk2"
 
 # This hardware's SSH server is old enough that current OpenSSH and Paramiko
 # releases no longer offer these by default; they have to be requested

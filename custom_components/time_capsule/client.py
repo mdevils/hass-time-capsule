@@ -1,4 +1,4 @@
-"""SSH plumbing shared by envstat and SMART status, plus the combined fetch.
+"""SSH plumbing shared by envstat, SMART status, and df, plus the combined fetch.
 
 Everything in here is blocking (paramiko has no asyncio API) and must be run
 via `hass.async_add_executor_job`, never awaited directly.
@@ -13,11 +13,13 @@ import paramiko
 
 from .const import (
     CONNECT_TIMEOUT,
+    DF_COMMAND,
     ENVSTAT_COMMAND,
     SMART_COMMAND,
     SSH_HOST_KEY_ALGORITHM,
     SSH_KEX_ALGORITHMS,
 )
+from .df import DiskUsage, parse_df
 from .envstat import EnvstatReading, parse_envstat
 from .smart import SmartStatus, parse_smart_status
 
@@ -32,10 +34,11 @@ class TimeCapsuleAuthError(TimeCapsuleConnectionError):
 
 @dataclass(frozen=True)
 class TimeCapsuleData:
-    """Everything fetched from one poll: envstat readings plus SMART status."""
+    """Everything fetched from one poll: envstat, SMART status, and disk usage."""
 
     envstat: dict[str, EnvstatReading]
     smart: SmartStatus
+    disk: DiskUsage | None
 
 
 def _connect(host: str, port: int, username: str, password: str) -> paramiko.Transport:
@@ -91,18 +94,21 @@ def _run_command(transport: paramiko.Transport, command: str) -> str:
 def fetch_time_capsule_data(
     host: str, port: int, username: str, password: str
 ) -> TimeCapsuleData:
-    """Open one SSH session, run envstat and smart status, and parse both.
+    """Open one SSH session, run envstat, smart status, and df, and parse all three.
 
-    Blocking; run in an executor. A single session is used for both commands
-    to spare this old device a second key-exchange handshake every poll.
+    Blocking; run in an executor. A single session is used for all three
+    commands to spare this old device a second/third key-exchange handshake
+    every poll.
     """
     transport = _connect(host, port, username, password)
     try:
         envstat_output = _run_command(transport, ENVSTAT_COMMAND)
         smart_output = _run_command(transport, SMART_COMMAND)
+        df_output = _run_command(transport, DF_COMMAND)
     finally:
         transport.close()
 
     envstat = {reading.key: reading for reading in parse_envstat(envstat_output)}
     smart = parse_smart_status(smart_output)
-    return TimeCapsuleData(envstat=envstat, smart=smart)
+    disk = parse_df(df_output)
+    return TimeCapsuleData(envstat=envstat, smart=smart, disk=disk)

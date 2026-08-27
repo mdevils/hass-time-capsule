@@ -1,12 +1,13 @@
-"""Sensor entities for a modded Time Capsule: envstat readings + SMART status.
+"""Sensor entities for a modded Time Capsule: envstat, SMART, and disk usage.
 
 Set up from the UI (Settings -> Devices & Services -> Add Integration ->
 Time Capsule Sensors); see config_flow.py. Exposes every degC envstat
 reading (other than T_hdd, which this hardware never populates) as a
 temperature sensor, the fan RPM reading as a fan-speed sensor, every SMART
-attribute as its own sensor, and one overall SMART pass/fail sensor. Which
-envstat sensors show up is driven entirely by what envstat reports, not a
-hardcoded list; the SMART attributes are whatever `smart status` lists.
+attribute as its own sensor, one overall SMART pass/fail sensor, and disk
+total/used/free/percent-used sensors for the internal drive. Which envstat
+sensors show up is driven entirely by what envstat reports, not a hardcoded
+list; same for the SMART attributes.
 """
 
 from __future__ import annotations
@@ -19,7 +20,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    CONF_HOST,
+    PERCENTAGE,
+    UnitOfInformation,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,6 +35,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpda
 from .client import TimeCapsuleData
 from .const import DOMAIN, FRIENDLY_NAMES, UNIT_FAN_RPM, UNIT_TEMPERATURE
 from .smart import SmartStatus
+
+DISK_METRIC_NAMES = {
+    "total": "Disk Total",
+    "used": "Disk Used",
+    "free": "Disk Free",
+    "percent": "Disk Used Percentage",
+}
 
 SMART_TEMPERATURE_DESCRIPTION = "Temperature"
 SMART_POWER_ON_HOURS_DESCRIPTION = "Power-on hours count"
@@ -60,6 +74,11 @@ async def async_setup_entry(
         for attr in coordinator.data.smart.attributes
     )
     entities.append(TimeCapsuleSmartStatusSensor(coordinator, host))
+
+    if coordinator.data.disk is not None:
+        entities.extend(
+            TimeCapsuleDiskSensor(coordinator, host, metric) for metric in DISK_METRIC_NAMES
+        )
 
     async_add_entities(entities)
 
@@ -186,3 +205,48 @@ class TimeCapsuleSmartStatusSensor(_TimeCapsuleEntity, SensorEntity):
         return {
             "failed_attributes": [a.description for a in smart.failed_attributes],
         }
+
+
+class TimeCapsuleDiskSensor(_TimeCapsuleEntity, SensorEntity):
+    """Total/used/free/percent-used usage for the internal drive."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, coordinator: DataUpdateCoordinator[TimeCapsuleData], host: str, metric: str
+    ) -> None:
+        super().__init__(coordinator, host)
+        self._metric = metric
+        self._attr_unique_id = f"{DOMAIN}_{host}_disk_{metric}"
+        self._attr_name = DISK_METRIC_NAMES[metric]
+
+        if metric == "percent":
+            self._attr_native_unit_of_measurement = PERCENTAGE
+        else:
+            self._attr_device_class = SensorDeviceClass.DATA_SIZE
+            self._attr_native_unit_of_measurement = UnitOfInformation.BYTES
+            self._attr_suggested_unit_of_measurement = UnitOfInformation.GIGABYTES
+            self._attr_suggested_display_precision = 2
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.coordinator.data.disk is not None
+
+    @property
+    def native_value(self) -> Any:
+        disk = self.coordinator.data.disk
+        if disk is None:
+            return None
+        return {
+            "total": disk.total_bytes,
+            "used": disk.used_bytes,
+            "free": disk.free_bytes,
+            "percent": disk.use_percent,
+        }[self._metric]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        disk = self.coordinator.data.disk
+        if disk is None:
+            return None
+        return {"filesystem": disk.filesystem, "mounted_on": disk.mounted_on}

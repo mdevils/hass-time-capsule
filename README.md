@@ -10,6 +10,7 @@ device once a minute and reports:
   sectors, power-on hours, pending sectors, temperature, and so on.
 - An overall SMART Status sensor (`Passed` / `Failed` / `Disabled` /
   `Not Supported`).
+- Disk usage for the internal drive: total, used, free, and percent used.
 
 It may also work with an AirPort Extreme, since it shares the same internal
 tooling, but that hasn't been tested -- if you try it, let me know via an
@@ -78,11 +79,12 @@ UI.
 
 ## How it works
 
-The integration authenticates over SSH and runs two commands: `envstat`,
-for the temperature and fan readings, and `atactl wd0 smart status`, for
-the SMART table. The SMART Status sensor's pass/fail is computed the same
-way `smartctl`'s health verdict is: an attribute has failed once its
-normalized value drops to or below its threshold on a row marked critical.
+The integration authenticates over SSH and runs three commands: `envstat`,
+for the temperature and fan readings; `atactl wd0 smart status`, for the
+SMART table; and `df /dev/dk2`, for disk usage. The SMART Status sensor's
+pass/fail is computed the same way `smartctl`'s health verdict is: an
+attribute has failed once its normalized value drops to or below its
+threshold on a row marked critical.
 
 These Time Capsules run an old NetBSD-based `sshd` that only offers a
 `diffie-hellman-group14-sha1` key exchange and signs its host key with
