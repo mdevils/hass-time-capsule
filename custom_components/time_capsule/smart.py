@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 _ATTR_RE = re.compile(
     r"^\s*(?P<id>\d+)\s+(?P<value>\d+)\s+(?P<thresh>\d+)\s+(?P<crit>yes|no)\s+"
-    r"(?P<collect>\S+)\s+(?P<reliability>\S+)\s+(?P<description>.+?)\s+(?P<raw>-?\d+)\s*$"
+    r"(?P<collect>\S+)\s+(?P<reliability>\S+)\s+(?P<description>.+?)\s+(?P<raw>-?\d+)(?:\s+Lifetime min/max\s+\d+/\d+)?\s*$"
 )
 
 
