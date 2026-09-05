@@ -43,7 +43,7 @@ DISK_METRIC_NAMES = {
     "percent": "Disk Used Percentage",
 }
 
-SMART_TEMPERATURE_DESCRIPTION = "Temperature"
+SMART_TEMPERATURE_DESCRIPTIONS = ("Temperature", "Airflow Temperature")
 SMART_POWER_ON_HOURS_DESCRIPTION = "Power-on hours count"
 
 
@@ -145,7 +145,7 @@ class TimeCapsuleSmartAttributeSensor(_TimeCapsuleEntity, SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{host}_{attr.key}"
         self._attr_name = attr.description
 
-        if attr.description == SMART_TEMPERATURE_DESCRIPTION:
+        if attr.description in SMART_TEMPERATURE_DESCRIPTIONS:
             self._attr_device_class = SensorDeviceClass.TEMPERATURE
             self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
         elif attr.description == SMART_POWER_ON_HOURS_DESCRIPTION:
