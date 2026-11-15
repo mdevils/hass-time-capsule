@@ -1,0 +1,6 @@
+                    Current  CritMax  WarnMax  WarnMin  CritMin  Unit
+[tsensor0]
+        T_internal:   45.320                                    degC
+       T_external1:   39.250   80.000                           degC
+             T_hdd:    0.000                                    degC
+           Fan_rpm:  1757                                        RPM

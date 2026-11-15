@@ -53,13 +53,30 @@ class SmartAttribute:
 class SmartStatus:
     """The parsed `smart status` output: header line plus attribute table."""
 
-    supported: bool
-    enabled: bool
+    supported: bool | None
+    enabled: bool | None
     attributes: tuple[SmartAttribute, ...]
+    complete: bool = False
+    threshold_exceeded: bool = False
+
+    @property
+    def status(self) -> str:
+        if self.threshold_exceeded:
+            return "Failed"
+        if self.supported is False:
+            return "Not Supported"
+        if self.enabled is False:
+            return "Disabled"
+        if self.supported is True and self.enabled is True:
+            if self.failed_attributes:
+                return "Failed"
+            if self.complete:
+                return "Passed"
+        return "Unknown"
 
     @property
     def healthy(self) -> bool:
-        return self.supported and self.enabled and not any(a.failed for a in self.attributes)
+        return self.status == "Passed"
 
     @property
     def failed_attributes(self) -> tuple[SmartAttribute, ...]:
@@ -67,15 +84,25 @@ class SmartStatus:
 
 
 def parse_smart_status(output: str) -> SmartStatus:
-    lines = output.splitlines()
-    header = lines[0] if lines else ""
-    supported = "SMART supported" in header
-    enabled = "SMART enabled" in header
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    messages = {line.casefold() for line in lines}
+    supported = None
+    enabled = None
+    if messages & {"smart not supported", "smart unsupported"}:
+        supported = False
+    elif any(line.startswith("smart supported,") for line in messages):
+        supported = True
+        if "smart supported, smart enabled" in messages:
+            enabled = True
+        elif "smart supported, smart disabled" in messages:
+            enabled = False
+    unreadable_row = False
 
     attributes: list[SmartAttribute] = []
-    for line in lines[1:]:
+    for line in lines:
         match = _ATTR_RE.match(line)
         if not match:
+            unreadable_row |= line[0].isdigit()
             continue
         attributes.append(
             SmartAttribute(
@@ -90,4 +117,10 @@ def parse_smart_status(output: str) -> SmartStatus:
             )
         )
 
-    return SmartStatus(supported=supported, enabled=enabled, attributes=tuple(attributes))
+    return SmartStatus(
+        supported=supported,
+        enabled=enabled,
+        attributes=tuple(attributes),
+        complete=bool(attributes) and not unreadable_row,
+        threshold_exceeded="threshold exceeds condition" in messages,
+    )

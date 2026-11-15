@@ -1,12 +1,13 @@
 {
   "domain": "time_capsule",
-  "name": "Time Capsule Sensors",
+  "name": "Apple Time Capsule",
   "documentation": "https://github.com/mdevils/hass-time-capsule",
   "issue_tracker": "https://github.com/mdevils/hass-time-capsule/issues",
   "codeowners": ["@mdevils"],
   "config_flow": true,
   "iot_class": "local_polling",
   "integration_type": "hub",
-  "requirements": ["paramiko>=2.7,<4"],
-  "version": "2.2.0"
+  "requirements": ["paramiko>=2.7,<4", "smbprotocol==1.16.1"],
+  "version": "2.2.0",
+  "zeroconf": ["_airport._tcp.local."]
 }

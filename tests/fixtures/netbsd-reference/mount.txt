@@ -1,0 +1,2 @@
+/dev/md0a on / type ffs (local)
+/dev/dk2 on /Volumes/dk2 type hfs (local)

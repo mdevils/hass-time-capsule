@@ -1,4 +1,4 @@
-"""Constants for the Time Capsule Sensors integration."""
+"""Constants for the Apple Time Capsule integration."""
 
 from __future__ import annotations
 
@@ -16,7 +16,11 @@ CONNECT_TIMEOUT = 15
 # on this device, even though an interactive shell's profile does.
 ENVSTAT_COMMAND = "/usr/sbin/envstat"
 SMART_COMMAND = "/sbin/atactl wd0 smart status"
-DF_COMMAND = "/bin/df /dev/dk2"
+BACKUP_DEVICE = "/dev/dk2"
+DF_COMMAND = f"/bin/df {BACKUP_DEVICE}"
+MOUNT_COMMAND = "/sbin/mount"
+HARDWARE_CHECKS = ("environment", "smart", "disk")
+BASE_STATION_NAME_COMMAND = "/usr/bin/acp -q syNm"
 
 # This hardware's SSH server is old enough that current OpenSSH and Paramiko
 # releases no longer offer these by default; they have to be requested
@@ -34,13 +38,24 @@ UNIT_FAN_RPM = "RPM"
 # hardware and always reads 0.
 IGNORED_LABELS = {"T_hdd"}
 
-# Cosmetic only -- friendly names for the labels envstat is known to report.
-# Anything not listed here still becomes a sensor, just with a less polished
-# name derived from its raw label.
-FRIENDLY_NAMES = {
-    "T_internal": "Internal Temperature",
-    "T_external1": "External Temperature 1",
-    "T_external2": "External Temperature 2",
-    "T_external3": "External Temperature 3",
-    "Fan_rpm": "Fan Speed",
+SMART_POWER_ON_HOURS_ID = 9
+SMART_TEMPERATURE_ID = 194
+SMART_HEALTH_IDS = {
+    5,  # Reallocated sector count
+    SMART_POWER_ON_HOURS_ID,
+    10,  # Spin retry count
+    12,  # Device power cycle count
+    187,  # Reported uncorrectable errors
+    197,  # Current pending sector
+    198,  # Offline uncorrectable
+    199,  # Ultra DMA CRC error count
 }
+
+CONF_ENTITY_KEY = "entity_key"
+CONF_SSH_FINGERPRINT = "ssh_fingerprint"
+CONF_AIRPORT_MAC = "airport_mac"
+CONF_MONITOR_SMB = "monitor_smb"
+CONF_SMB_SHARE = "smb_share"
+CONF_SMB_USERNAME = "smb_username"
+CONF_SMB_PASSWORD = "smb_password"
+AIRPORT_TIME_CAPSULE_MODEL = "119"

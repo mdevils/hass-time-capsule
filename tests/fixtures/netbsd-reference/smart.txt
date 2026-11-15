@@ -1,0 +1,5 @@
+SMART supported, SMART enabled
+ id value thresh crit collect reliability description            raw
+  5  200     140 yes  online  positive    Reallocated sector count  2
+190   48      40 no   online  positive    Airflow Temperature      52
+197  100       0 no   online  positive    Current pending sector    0

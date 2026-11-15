@@ -11,7 +11,10 @@ means the output is always exactly a header line plus one data line.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+
+_MOUNT_RE = re.compile(r"^(?P<device>\S+) on .+ (?:type \S+(?: \(.+\))?|\(.+\))$")
 
 _BLOCK_SIZE = 512
 
@@ -53,3 +56,13 @@ def parse_df(output: str) -> DiskUsage | None:
         use_percent=use_percent,
         mounted_on=" ".join(tokens[5:]),
     )
+
+
+def is_volume_mounted(output: str, device: str) -> bool | None:
+    """Return Unknown if the mount listing could not be recognized."""
+    devices = {
+        match["device"]
+        for line in output.splitlines()
+        if (match := _MOUNT_RE.fullmatch(line.strip()))
+    }
+    return device in devices if devices else None
