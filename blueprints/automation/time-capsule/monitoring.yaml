@@ -1,0 +1,294 @@
+blueprint:
+  name: Time Capsule health and backup alerts
+  description: >
+    Monitors Time Capsule hardware and optional Mac backup sensors. Use a
+    separate text helper with a 255-character limit for each automation.
+    The helper remembers active alerts, delays, and the last sector count
+    across Home Assistant restarts.
+  domain: automation
+  input:
+    saved_state:
+      name: Alert state helper
+      description: Select a dedicated Text helper with a maximum length of 255.
+      selector:
+        entity:
+          filter:
+            - domain: input_text
+    connectivity:
+      name: Connection and mount sensors
+      description: >-
+        Select Backup Volume Mounted or the optional SMB sensors. A selected
+        sensor that is off or unavailable can trigger an outage alert.
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+    connection_delay:
+      name: Connection or mount outage delay
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          unit_of_measurement: min
+    smart:
+      name: SMART Status
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    pending:
+      name: Current pending sector sensor
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    reallocated:
+      name: Reallocated sector count sensor
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    disk_free:
+      name: Disk Free Percentage
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              unit_of_measurement: "%"
+    disk_limit:
+      name: Low free-space limit
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 50
+          unit_of_measurement: "%"
+    temperature:
+      name: Temperature sensor
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: temperature
+    temperature_limit:
+      name: High temperature limit
+      description: Enter the limit in the selected sensor's displayed unit.
+      default: 55
+      selector:
+        number:
+          min: 0
+          max: 220
+          mode: box
+    storage_delay:
+      name: Temperature and low-space delay
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+    backup_age:
+      name: Mac Time Capsule Backup Age
+      description: Hours since the last completed backup to this destination.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              unit_of_measurement: h
+    backup_limit:
+      name: Backup overdue after
+      default: 48
+      selector:
+        number:
+          min: 1
+          max: 336
+          unit_of_measurement: h
+    last_report:
+      name: Mac Time Capsule Last Report
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: timestamp
+    report_limit:
+      name: Mac reporter silent after
+      default: 24
+      selector:
+        number:
+          min: 1
+          max: 336
+          unit_of_measurement: h
+    reporter_status:
+      name: Mac Time Capsule Reporter Status
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    notification_actions:
+      name: Notification actions
+      description: Use {{ message }} in your own notification action to include the alert or recovery details.
+      default:
+        - action: persistent_notification.create
+          data:
+            title: Time Capsule
+            message: "{{ message }}"
+            notification_id: "{{ state_helper }}"
+      selector:
+        action: {}
+
+mode: queued
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/1"
+
+variables:
+  state_helper: !input saved_state
+  connectivity_entities: !input connectivity
+  connection_delay_minutes: !input connection_delay
+  smart_entity: !input smart
+  pending_entity: !input pending
+  reallocated_entity: !input reallocated
+  disk_entity: !input disk_free
+  disk_limit_percent: !input disk_limit
+  temperature_entity: !input temperature
+  temperature_limit_value: !input temperature_limit
+  storage_delay_minutes: !input storage_delay
+  backup_entity: !input backup_age
+  backup_limit_hours: !input backup_limit
+  report_entity: !input last_report
+  report_limit_hours: !input report_limit
+  reporter_entity: !input reporter_status
+
+conditions:
+  - condition: template
+    value_template: "{{ states(state_helper) != 'unavailable' and (state_attr(state_helper, 'max') | int(0)) >= 255 }}"
+
+actions:
+  - variables:
+      checked_at: "{{ as_timestamp(now()) | int }}"
+      missing_sensors: >
+        {% set selected = connectivity_entities + [smart_entity, pending_entity,
+           reallocated_entity, disk_entity, temperature_entity, backup_entity,
+           report_entity, reporter_entity] %}
+        {% set result = namespace(ids=[]) %}
+        {% if trigger.platform != 'homeassistant' %}
+          {% for entity in selected | reject('eq', '') | unique | sort %}
+            {% if states[entity] is none %}
+              {% set result.ids = result.ids + [entity] %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ result.ids }}
+      saved: >
+        {% set previous = states(state_helper) | from_json({}) %}
+        {{ previous if previous is mapping else {} }}
+      labels:
+        c: A connection or backup volume has been down
+        s: SMART reported a drive failure
+        u: SMART readings have stayed unreadable
+        p: The drive has pending sectors
+        d: Free disk space has stayed below the configured limit
+        t: Temperature has stayed above the configured limit
+        b: Time Machine backup is overdue
+        h: The Mac backup reporter has stopped reporting
+        m: The Mac reporter could not read the backup destination
+      checks: >
+        {% set links = connectivity_entities | map('states') | list %}
+        {% set smart = states(smart_entity) if smart_entity else '' %}
+        {% set pending = states(pending_entity) | float(none) if pending_entity else none %}
+        {% set disk = states(disk_entity) | float(none) if disk_entity else none %}
+        {% set temperature = states(temperature_entity) | float(none) if temperature_entity else none %}
+        {% set backup = states(backup_entity) | float(none) if backup_entity else none %}
+        {% set started_monitoring = saved.get('f', checked_at) %}
+        {% set reported = as_timestamp(states(report_entity), started_monitoring) if report_entity else none %}
+        {% set reporter = states(reporter_entity) if reporter_entity else '' %}
+        {{
+          [
+            ('c', true if 'off' in links or 'unavailable' in links else (false if links | reject('eq', 'on') | list | length == 0 else none), connection_delay_minutes * 60),
+            ('s', smart == 'Failed' if smart in ['', 'Passed', 'Failed'] else none, 0),
+            ('u', smart == 'Unknown' if smart not in ['unknown', 'unavailable'] else none, connection_delay_minutes * 60),
+            ('p', pending > 0 if pending is not none else (false if not pending_entity else none), 0),
+            ('d', disk < disk_limit_percent if disk is not none else (false if not disk_entity else none), storage_delay_minutes * 60),
+            ('t', temperature > temperature_limit_value if temperature is not none else (false if not temperature_entity else none), storage_delay_minutes * 60),
+            ('b', backup > backup_limit_hours if backup is not none else (false if not backup_entity else none), 0),
+            ('h', checked_at - reported > report_limit_hours * 3600 if reported is not none else (false if not report_entity else none), 0),
+            ('m', reporter != 'ok' if reporter in ['ok', 'destination_unavailable', 'read_error'] else (false if not reporter_entity else none), connection_delay_minutes * 60)
+          ]
+        }}
+      counter: "{{ states(reallocated_entity) | int(none) if reallocated_entity else none }}"
+  - variables:
+      missing_key: "{{ missing_sensors | join(',') | sha1 if missing_sensors else '' }}"
+  - variables:
+      tracked: >
+        {% set active = saved.get('a', []) %}
+        {% set pending = saved.get('p', {}) %}
+        {% set result = namespace(active=[], pending=[]) %}
+        {% for code, fault, delay in checks %}
+          {% if fault == true or (fault is none and code in active) %}
+            {% set started = pending.get(code, checked_at) %}
+            {% if code in active or checked_at - started >= delay %}
+              {% set result.active = result.active + [code] %}
+            {% else %}
+              {% set result.pending = result.pending + [(code, started)] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {% set state = dict(a=result.active, p=dict(result.pending),
+                           r=counter if counter is not none else saved.get('r'), f=saved.get('f', checked_at)) %}
+        {{ dict(state, x=missing_key) if missing_key else state }}
+      sectors_increased: "{{ counter is not none and saved.get('r') is number and counter > saved['r'] }}"
+  - variables:
+      added: "{{ tracked.a | reject('in', saved.get('a', [])) | list }}"
+      recovered: "{{ saved.get('a', []) | reject('in', tracked.a) | list }}"
+      message: >
+        {% for code in added %}{{ labels[code] }}. {{ '\n' }}{% endfor %}
+        {% if sectors_increased %}Reallocated sectors increased from {{ saved.r }} to {{ counter }}. {{ '\n' }}{% endif %}
+        {% for code in recovered %}Cleared: {{ labels[code] }}. {{ '\n' }}{% endfor %}
+        {% if tracked.a and (added or sectors_increased or recovered) %}
+          Active checks: {% for code in tracked.a %}{{ labels[code] }}{% if not loop.last %}; {% endif %}{% endfor %}.
+        {% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ saved.get('x', '') != missing_key }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ missing_sensors | count > 0 }}"
+        then:
+          - action: persistent_notification.create
+            data:
+              title: Time Capsule alert needs attention
+              message: >
+                Edit **{{ this.attributes.friendly_name }}** and replace or clear
+                these missing sensors: {{ missing_sensors | join(', ') }}.
+              notification_id: "{{ this.entity_id }}_missing_sensors"
+        else:
+          - action: persistent_notification.dismiss
+            data:
+              notification_id: "{{ this.entity_id }}_missing_sensors"
+  - if:
+      - condition: template
+        value_template: "{{ saved != tracked }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: !input saved_state
+        data:
+          value: "{{ tracked | to_json }}"
+  - if:
+      - condition: template
+        value_template: "{{ added | count > 0 or recovered | count > 0 or sectors_increased }}"
+    then: !input notification_actions

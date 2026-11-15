@@ -1,0 +1,52 @@
+# Home Assistant package. Substitute the entity IDs shown on your Time Capsule device.
+# This example sends a notification in Home Assistant when one of the checks trips.
+automation:
+  - id: time_capsule_health_alert
+    alias: Time Capsule health alert
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: sensor.time_capsule_smart_status
+        to: Failed
+        id: SMART reported a drive failure
+      - trigger: state
+        entity_id: sensor.time_capsule_smart_status
+        to: Unknown
+        for: "00:05:00"
+        id: SMART readings have been unreadable for five minutes
+      - trigger: numeric_state
+        entity_id: sensor.time_capsule_current_pending_sector
+        above: 0
+        id: The drive has pending sectors
+      - trigger: template
+        value_template: >
+          {% set last = as_timestamp(states('sensor.time_capsule_last_successful_reading'), 0) %}
+          {{ last > 0 and as_timestamp(now()) - last > 600 }}
+        id: No usable hardware readings for ten minutes
+      - trigger: numeric_state
+        entity_id: sensor.time_capsule_disk_free_percentage
+        below: 10
+        for: "00:15:00"
+        id: Free disk space has been below 10 percent for fifteen minutes
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: Time Capsule
+          message: "{{ trigger.id }}"
+
+  - id: time_capsule_reallocated_sectors_increased
+    alias: Time Capsule reallocated sectors increased
+    triggers:
+      - trigger: state
+        entity_id: sensor.time_capsule_reallocated_sector_count
+    conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.from_state is not none and trigger.to_state is not none
+             and is_number(trigger.from_state.state) and is_number(trigger.to_state.state)
+             and trigger.to_state.state | int > trigger.from_state.state | int }}
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: Time Capsule
+          message: "Reallocated sectors increased from {{ trigger.from_state.state }} to {{ trigger.to_state.state }}."
