@@ -1,0 +1,62 @@
+# Home Assistant package. See README for configuring more than one Mac and destination.
+template:
+  - triggers:
+      - trigger: webhook
+        webhook_id: !secret time_machine_mac_webhook
+        allowed_methods: [POST]
+        local_only: true
+    conditions:
+      - condition: template
+        value_template: >
+          {% set report = trigger.json | default({}, true) %}
+          {% if report is not mapping %}
+            false
+          {% else %}
+            {% set status = report.get('status', 'ok') %}
+            {% set backup = as_timestamp(report.get('backup_at'), 0) %}
+            {{ status in ['destination_unavailable', 'read_error']
+               or (status == 'ok' and 0 < backup <= as_timestamp(now()) + 300) }}
+          {% endif %}
+    sensor:
+      - name: Mac Last Time Capsule Backup
+        unique_id: mac_last_time_capsule_backup
+        device_class: timestamp
+        state: >
+          {% set report = trigger.json %}
+          {% set previous = as_timestamp(this.state, 0) %}
+          {% set reported = as_timestamp(report.get('backup_at'), 0)
+                      if report.get('status', 'ok') == 'ok' else 0 %}
+          {% set latest = [reported, previous] | max %}
+          {{ as_datetime(latest).isoformat() if latest else none }}
+      - name: Mac Time Capsule Last Report
+        unique_id: mac_time_capsule_last_report
+        device_class: timestamp
+        state: "{{ now().isoformat() }}"
+      - name: Mac Time Capsule Reporter Status
+        unique_id: mac_time_capsule_reporter_status
+        state: "{{ trigger.json.get('status', 'ok') }}"
+
+  - sensor:
+      - name: Mac Time Capsule Backup Age
+        unique_id: mac_time_capsule_backup_age
+        unit_of_measurement: h
+        state_class: measurement
+        availability: >
+          {{ as_timestamp(states('sensor.mac_last_time_capsule_backup'), 0) > 0 }}
+        state: >
+          {% set backup = as_timestamp(states('sensor.mac_last_time_capsule_backup'), 0) %}
+          {{ ([0, (as_timestamp(now()) - backup) / 3600] | max) | round(1) if backup else none }}
+
+# Disable this example if the alert blueprint also monitors this Mac's backup age.
+automation:
+  - id: mac_time_capsule_backup_overdue
+    alias: Mac Time Capsule backup overdue
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.mac_time_capsule_backup_age
+        above: 48
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: Time Machine backup overdue
+          message: This Mac has not reported a successful backup to the Time Capsule in over 48 hours.
