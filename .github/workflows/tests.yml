@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  home-assistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install Home Assistant and integration dependencies
+        if: hashFiles('tests/test_*.py') != ''
+        run: |
+          python -m pip install -r .github/test-requirements.txt
+          python -c 'import json; print("\n".join(json.load(open("custom_components/time_capsule/manifest.json"))["requirements"]))' > "$RUNNER_TEMP/time-capsule-requirements.txt"
+          python -m pip install -r "$RUNNER_TEMP/time-capsule-requirements.txt"
+      - name: Run integration and automation tests
+        if: hashFiles('tests/test_*.py') != ''
+        run: python -m unittest discover -s tests -v
+      - name: Check the Mac reporter syntax
+        if: hashFiles('examples/report-time-machine-backup.sh') != ''
+        run: bash -n examples/report-time-machine-backup.sh
