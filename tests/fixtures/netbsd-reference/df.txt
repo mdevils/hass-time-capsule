@@ -1,0 +1,2 @@
+Filesystem   512-blocks       Used      Avail %Cap Mounted on
+/dev/dk2     5856338784  458384792 5397953992   7% /Volumes/dk2

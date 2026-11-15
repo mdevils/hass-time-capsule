@@ -2,12 +2,36 @@
   "config": {
     "step": {
       "user": {
+        "title": "Set up Time Capsule",
+        "description": "Open [Devices & services](/config/integrations/dashboard) and look under **Discovered** for your Time Capsule. If it doesn't appear there, you can enter its address manually.",
+        "menu_options": {
+          "connect": "Enter address manually"
+        }
+      },
+      "connect": {
         "title": "Connect to Time Capsule",
-        "description": "SSH connection details for the modded Time Capsule running envstat.",
+        "description": "Enter the SSH connection details for your Time Capsule.",
         "data": {
           "host": "Host",
           "username": "Username",
           "port": "Port",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change Time Capsule connection",
+        "description": "Enter the address and SSH credentials for this Time Capsule.",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "port": "Port",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update Time Capsule credentials",
+        "data": {
+          "username": "Username",
           "password": "Password"
         }
       }
@@ -15,28 +39,45 @@
     "error": {
       "cannot_connect": "Failed to connect. Check the host and port, and that the device is reachable.",
       "invalid_auth": "Authentication failed. Check the username and password.",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "device_changed": "The SSH identity changed. Check that this address still belongs to your Time Capsule."
     },
     "abort": {
-      "already_configured": "This Time Capsule is already configured."
-    }
+      "already_configured": "This Time Capsule is already configured.",
+      "not_time_capsule": "This AirPort is not a supported Time Capsule model.",
+      "cannot_verify_discovery": "The discovered address could not be verified against the saved Time Capsule."
+    },
+    "flow_title": "{name}"
   },
   "options": {
     "step": {
       "init": {
-        "title": "Time Capsule connection settings",
+        "title": "Backup share monitoring",
+        "description": "Check TCP port 445 from Home Assistant. To also open a share for reading, enter its name and separate SMB login. Clear the share and username to use only the port check.",
         "data": {
-          "host": "Host",
-          "username": "Username",
-          "port": "Port",
-          "password": "Password"
+          "monitor_smb": "Monitor the SMB service",
+          "smb_share": "SMB share name",
+          "smb_username": "SMB username",
+          "smb_password": "SMB password"
+        },
+        "data_description": {
+          "smb_password": "Leave blank to keep the password for an unchanged share and username."
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect. Check the host and port, and that the device is reachable.",
-      "invalid_auth": "Authentication failed. Check the username and password.",
-      "unknown": "Unexpected error."
+      "invalid_share": "Enter the share name only, without a server address or folder path.",
+      "incomplete_share": "Enter a share name, SMB username, and password together, or clear all three entries."
+    }
+  },
+  "issues": {
+    "retired_alert_connection": {
+      "title": "Replace SSH Connected in your Time Capsule alerts",
+      "description": "An automation still uses the retired sensor `{entity_id}`. Edit the automation and select **Backup Volume Mounted** (`{replacement}`) under **Connection and mount sensors**. This also detects when the backup volume is unmounted."
+    },
+    "retired_alert_temperature": {
+      "title": "Update a Time Capsule temperature alert",
+      "description": "An automation still uses the retired temperature sensor `{entity_id}`. Edit the automation and select **Temperature** (`{replacement}`). Check the threshold because the new sensor can use a different temperature source."
     }
   }
 }
